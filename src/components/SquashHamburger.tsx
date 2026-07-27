@@ -8,7 +8,7 @@ interface SquashHamburgerProps {
 }
 
 export const SquashHamburger: React.FC<SquashHamburgerProps> = ({ isOpen, onClick, isMobile = false }) => {
-  const springConfig = { type: 'spring', stiffness: 300, damping: 20 };
+  const springConfig = { type: 'spring', stiffness: 300, damping: 20 } as const;
   const widthClass = isMobile ? 'w-[15px] h-[10px]' : 'w-[18px] h-[12px]';
   const barHeight = isMobile ? 1.2 : 1.5;
 
