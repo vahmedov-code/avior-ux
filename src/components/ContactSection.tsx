@@ -5,7 +5,7 @@ export const ContactSection: React.FC = () => {
   return (
     <section id="contact" className="relative w-full min-h-screen bg-black flex items-center justify-center py-32 px-6 overflow-hidden">
       <video
-        src="/video4.mp4"
+        src="/video2.mp4"
         className="absolute inset-0 w-full h-full object-cover z-0 opacity-25"
         autoPlay
         muted
