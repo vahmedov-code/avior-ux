@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { ScrambleIn } from './ScrambleIn';
 
 interface CaseStat {
   value: string;
@@ -44,6 +45,7 @@ const cases: CaseStudy[] = [
 ];
 
 export const CaseSection: React.FC = () => {
+  const [headingTriggered, setHeadingTriggered] = useState(false);
   return (
     <section id="case" className="relative w-full min-h-screen bg-black flex items-center justify-center py-32 px-6">
       <video
@@ -59,6 +61,7 @@ export const CaseSection: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
+          onViewportEnter={() => setHeadingTriggered(true)}
           transition={{ duration: 0.8 }}
           viewport={{ once: true, amount: 0.3 }}
           className="mb-16"
@@ -67,7 +70,7 @@ export const CaseSection: React.FC = () => {
             // ПРИМЕРЫ РАБОТ
           </div>
           <h2 className="text-white font-light text-[clamp(28px,5vw,46px)] leading-tight">
-            Действующие сайты, а не просто макеты
+            <ScrambleIn text="Действующие сайты, а не просто макеты" delay={100} triggered={headingTriggered} />
           </h2>
           <p className="text-white/50 text-[15px] mt-4 max-w-xl leading-relaxed">
             Строю по тем же принципам, что предлагаю клиентам — рабочий результат, а не демо-версия.
