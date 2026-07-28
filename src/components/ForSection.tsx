@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { ScrambleIn } from './ScrambleIn';
 
 export const ForSection: React.FC = () => {
+  const [headingTriggered, setHeadingTriggered] = useState(false);
   const items = [
     {
       num: '01',
@@ -35,6 +37,7 @@ export const ForSection: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
+          onViewportEnter={() => setHeadingTriggered(true)}
           transition={{ duration: 0.8 }}
           viewport={{ once: true, amount: 0.3 }}
           className="mb-16"
@@ -43,7 +46,7 @@ export const ForSection: React.FC = () => {
             // ДЛЯ КОГО ЭТО
           </div>
           <h2 className="text-white font-light text-[clamp(28px,5vw,46px)] leading-tight max-w-2xl">
-            Для тех, кто сам держит бизнес на себе
+            <ScrambleIn text="Для тех, кто сам держит бизнес на себе" delay={100} triggered={headingTriggered} />
           </h2>
           <p className="text-white/50 text-[15px] mt-4 max-w-xl leading-relaxed">
             Не для стартапов с раундом инвестиций. Для тех, кто хочет, чтобы сайт реально приводил клиентов, а не просто был «для галочки».
