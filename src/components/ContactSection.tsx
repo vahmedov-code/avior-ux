@@ -23,7 +23,7 @@ export const ContactSection: React.FC = () => {
           </p>
 
           <a 
-            href="https://t.me/" 
+            href="https://t.me/ghost0590" 
             target="_blank" 
             rel="noreferrer"
             className="inline-flex items-center gap-3 px-8 py-4 bg-[#33d17e] text-black font-semibold rounded-full hover:bg-[#ffb15c] transition-colors text-[16px]"
