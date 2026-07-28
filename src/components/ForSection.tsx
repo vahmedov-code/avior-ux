@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ScrambleIn } from './ScrambleIn';
+import { Warp } from '@paper-design/shaders-react';
 
 export const ForSection: React.FC = () => {
   const [headingTriggered, setHeadingTriggered] = useState(false);
@@ -8,17 +9,20 @@ export const ForSection: React.FC = () => {
     {
       num: '01',
       title: 'Мастера-одиночки',
-      desc: 'Ремонт, услуги на дому, частная практика — там, где вы сами и мастер, и приёмщик, и бухгалтер.'
+      desc: 'Ремонт, услуги на дому, частная практика — там, где вы сами и мастер, и приёмщик, и бухгалтер.',
+      colors: ['hsl(152, 63%, 12%)', 'hsl(152, 65%, 51%)', 'hsl(170, 55%, 40%)', 'hsl(210, 25%, 8%)']
     },
     {
       num: '02',
       title: 'Малый бизнес',
-      desc: 'Небольшая команда без штатного разработчика, которой нужен рабочий сайт, а не эксперимент на годы.'
+      desc: 'Небольшая команда без штатного разработчика, которой нужен рабочий сайт, а не эксперимент на годы.',
+      colors: ['hsl(28, 80%, 14%)', 'hsl(35, 100%, 60%)', 'hsl(45, 85%, 55%)', 'hsl(210, 25%, 8%)']
     },
     {
       num: '03',
       title: 'Тем, кого уже подводили',
-      desc: 'Если был опыт с агентством, которое взяло деньги и пропало — здесь работаем иначе, с понятным объёмом и сроком.'
+      desc: 'Если был опыт с агентством, которое взяло деньги и пропало — здесь работаем иначе, с понятным объёмом и сроком.',
+      colors: ['hsl(195, 65%, 14%)', 'hsl(190, 80%, 50%)', 'hsl(165, 55%, 42%)', 'hsl(210, 25%, 8%)']
     }
   ];
 
@@ -61,12 +65,30 @@ export const ForSection: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: i * 0.15 }}
               viewport={{ once: true, amount: 0.3 }}
-              className="p-8 border border-white/10 rounded-xl bg-white/[0.03] backdrop-blur-md hover:border-[#33d17e]/50 transition-colors flex flex-col justify-between"
+              className="relative overflow-hidden p-8 border border-white/10 rounded-xl bg-white/[0.03] backdrop-blur-md hover:border-white/25 transition-colors flex flex-col justify-between"
             >
-              <div>
+              <div className="absolute inset-0 z-0 opacity-25">
+                <Warp
+                  style={{ height: '100%', width: '100%' }}
+                  proportion={0.35}
+                  softness={1.3}
+                  distortion={0.12}
+                  swirl={0.5}
+                  swirlIterations={6}
+                  shape="checks"
+                  shapeScale={0.08}
+                  scale={1}
+                  rotation={0}
+                  speed={0.35}
+                  colors={item.colors}
+                />
+              </div>
+              <div className="absolute inset-0 z-0 bg-black/45" />
+
+              <div className="relative z-10">
                 <div className="text-[#33d17e] text-[14px] font-mono mb-4">{item.num}</div>
                 <h3 className="text-white text-[20px] font-semibold mb-3">{item.title}</h3>
-                <p className="text-white/50 text-[14px] leading-relaxed">{item.desc}</p>
+                <p className="text-white/60 text-[14px] leading-relaxed">{item.desc}</p>
               </div>
             </motion.div>
           ))}
