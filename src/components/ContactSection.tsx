@@ -3,8 +3,18 @@ import { motion } from 'framer-motion';
 
 export const ContactSection: React.FC = () => {
   return (
-    <section id="contact" className="relative w-full min-h-screen bg-black flex items-center justify-center py-32 px-6">
-      <div className="max-w-3xl w-full mx-auto text-center">
+    <section id="contact" className="relative w-full min-h-screen bg-black flex items-center justify-center py-32 px-6 overflow-hidden">
+      <video
+        src="/video4.mp4"
+        className="absolute inset-0 w-full h-full object-cover z-0 opacity-25"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+      <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80" />
+
+      <div className="relative z-10 max-w-3xl w-full mx-auto text-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
