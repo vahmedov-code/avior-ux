@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ScrambleIn } from './ScrambleIn';
+import { Warp } from '@paper-design/shaders-react';
 
 interface HeroSectionProps {
   onEntranceComplete: () => void;
@@ -150,42 +151,61 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onEntranceComplete }) 
               initial={{ y: 30, opacity: 0 }}
               animate={entranceComplete ? { y: 0, opacity: 1 } : {}}
               transition={{ duration: 0.9, delay: 0.6 }}
-              className="bg-[#f3f1ea] text-[#0e1218] rounded-xl overflow-hidden shadow-2xl border border-white/10 font-mono"
+              className="relative rounded-xl overflow-hidden shadow-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl font-mono"
             >
-              <div className="p-5 border-b border-dashed border-[#c9c3b3] flex justify-between items-start bg-[#ece7d8]">
+              {/* Анимированный шейдер-фон в фирменной палитре */}
+              <div className="absolute inset-0 z-0 opacity-30">
+                <Warp
+                  style={{ height: '100%', width: '100%' }}
+                  proportion={0.35}
+                  softness={1.3}
+                  distortion={0.12}
+                  swirl={0.5}
+                  swirlIterations={6}
+                  shape="checks"
+                  shapeScale={0.08}
+                  scale={1}
+                  rotation={0}
+                  speed={0.4}
+                  colors={['hsl(152, 63%, 12%)', 'hsl(152, 65%, 51%)', 'hsl(30, 100%, 68%)', 'hsl(210, 25%, 8%)']}
+                />
+              </div>
+              <div className="absolute inset-0 z-0 bg-[#0e1218]/40" />
+
+              <div className="relative z-10 p-5 border-b border-dashed border-white/15 flex justify-between items-start">
                 <div>
-                  <div className="text-[11px] text-[#6b6858] tracking-widest">ЗАЯВКА</div>
-                  <div className="text-[18px] font-bold">UX-047</div>
+                  <div className="text-[11px] text-white/40 tracking-widest">ЗАЯВКА</div>
+                  <div className="text-[18px] font-bold text-white">UX-047</div>
                 </div>
-                <div className="text-[11px] font-bold border-2 border-[#0f6e56] text-[#0f6e56] px-2 py-1 rounded -rotate-3 uppercase tracking-wider">
+                <div className="text-[11px] font-bold border-2 border-[#33d17e] text-[#33d17e] px-2 py-1 rounded -rotate-3 uppercase tracking-wider bg-[#0e1218]/60">
                   В РАБОТЕ
                 </div>
               </div>
 
-              <div className="p-5 space-y-3 text-[13px]">
+              <div className="relative z-10 p-5 space-y-3 text-[13px]">
                 <div className="flex items-center gap-3">
-                  <span className="w-4 h-4 bg-[#0f6e56] text-white rounded flex items-center justify-center text-[10px] font-bold">✓</span>
-                  <span className="text-[#0e1218] font-medium">Адаптивная вёрстка под все экраны</span>
+                  <span className="w-4 h-4 bg-[#33d17e] text-[#0e1218] rounded flex items-center justify-center text-[10px] font-bold">✓</span>
+                  <span className="text-white font-medium">Адаптивная вёрстка под все экраны</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="w-4 h-4 bg-[#0f6e56] text-white rounded flex items-center justify-center text-[10px] font-bold">✓</span>
-                  <span className="text-[#0e1218] font-medium">SEO-структура и микроразметка</span>
+                  <span className="w-4 h-4 bg-[#33d17e] text-[#0e1218] rounded flex items-center justify-center text-[10px] font-bold">✓</span>
+                  <span className="text-white font-medium">SEO-структура и микроразметка</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="w-4 h-4 bg-[#0f6e56] text-white rounded flex items-center justify-center text-[10px] font-bold">✓</span>
-                  <span className="text-[#0e1218] font-medium">Форма заявок с уведомлениями</span>
+                  <span className="w-4 h-4 bg-[#33d17e] text-[#0e1218] rounded flex items-center justify-center text-[10px] font-bold">✓</span>
+                  <span className="text-white font-medium">Форма заявок с уведомлениями</span>
                 </div>
-                <div className="flex items-center gap-3 text-[#6b6858]">
-                  <span className="w-4 h-4 border border-[#a39d89] rounded"></span>
+                <div className="flex items-center gap-3 text-white/40">
+                  <span className="w-4 h-4 border border-white/30 rounded"></span>
                   <span>Админка для самостоятельных правок</span>
                 </div>
-                <div className="flex items-center gap-3 text-[#6b6858]">
-                  <span className="w-4 h-4 border border-[#a39d89] rounded"></span>
+                <div className="flex items-center gap-3 text-white/40">
+                  <span className="w-4 h-4 border border-white/30 rounded"></span>
                   <span>Интеграции: CRM, боты, аналитика</span>
                 </div>
               </div>
 
-              <div className="p-4 bg-[#ece7d8] border-t border-[#c9c3b3] flex justify-between text-[11px] text-[#6b6858]">
+              <div className="relative z-10 p-4 border-t border-white/15 flex justify-between text-[11px] text-white/40 bg-black/20">
                 <span>СРОК: 5–14 ДНЕЙ</span>
                 <span>МАСТЕР: ВЕЙС</span>
               </div>
