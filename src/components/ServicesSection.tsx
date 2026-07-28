@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ScrambleIn } from './ScrambleIn';
+import { Warp } from '@paper-design/shaders-react';
 
 export const ServicesSection: React.FC = () => {
   const [headingTriggered, setHeadingTriggered] = useState(false);
@@ -10,6 +11,7 @@ export const ServicesSection: React.FC = () => {
       title: 'Лендинг',
       price: 'от 25 000 ₽',
       popular: false,
+      colors: ['hsl(152, 40%, 10%)', 'hsl(152, 45%, 35%)', 'hsl(170, 40%, 30%)', 'hsl(210, 25%, 8%)'],
       features: [
         'Одна страница под ваш бизнес',
         'Адаптивная вёрстка под мобильные',
@@ -22,6 +24,7 @@ export const ServicesSection: React.FC = () => {
       title: 'Лендинг + админка',
       price: 'от 55 000 ₽',
       popular: true,
+      colors: ['hsl(152, 63%, 12%)', 'hsl(152, 70%, 52%)', 'hsl(35, 100%, 60%)', 'hsl(210, 25%, 8%)'],
       features: [
         'Всё из уровня 1',
         'Несколько страниц (услуги, о вас)',
@@ -34,6 +37,7 @@ export const ServicesSection: React.FC = () => {
       title: 'Полный цикл',
       price: 'от 120 000 ₽',
       popular: false,
+      colors: ['hsl(20, 75%, 14%)', 'hsl(35, 100%, 58%)', 'hsl(15, 80%, 50%)', 'hsl(210, 25%, 8%)'],
       features: [
         'Всё из уровня 2',
         'Интеграции: CRM, боты, аналитика',
@@ -83,13 +87,31 @@ export const ServicesSection: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: i * 0.15 }}
               viewport={{ once: true, amount: 0.3 }}
-              className={`p-8 rounded-2xl flex flex-col justify-between backdrop-blur-md transition-colors ${
+              className={`relative overflow-hidden p-8 rounded-2xl flex flex-col justify-between backdrop-blur-md transition-colors ${
                 tier.popular 
                   ? 'bg-white/[0.06] border-2 border-[#33d17e]' 
                   : 'bg-white/[0.02] border border-white/10'
               }`}
             >
-              <div>
+              <div className="absolute inset-0 z-0" style={{ opacity: tier.popular ? 0.3 : 0.18 }}>
+                <Warp
+                  style={{ height: '100%', width: '100%' }}
+                  proportion={0.35}
+                  softness={1.3}
+                  distortion={0.12}
+                  swirl={0.5}
+                  swirlIterations={6}
+                  shape="checks"
+                  shapeScale={0.08}
+                  scale={1}
+                  rotation={0}
+                  speed={0.35}
+                  colors={tier.colors}
+                />
+              </div>
+              <div className="absolute inset-0 z-0 bg-black/45" />
+
+              <div className="relative z-10">
                 <div className={`text-[12px] uppercase tracking-wider mb-3 ${tier.popular ? 'text-[#33d17e] font-semibold' : 'text-white/40'}`}>
                   {tier.tag}
                 </div>
@@ -108,7 +130,7 @@ export const ServicesSection: React.FC = () => {
 
               <a 
                 href="#contact"
-                className={`w-full py-3.5 rounded-lg text-center text-[14px] font-semibold transition-colors ${
+                className={`relative z-10 w-full py-3.5 rounded-lg text-center text-[14px] font-semibold transition-colors ${
                   tier.popular
                     ? 'bg-[#33d17e] text-black hover:bg-[#ffb15c]'
                     : 'bg-white/10 text-white hover:bg-white/20'
