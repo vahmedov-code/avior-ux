@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { ScrambleIn } from './ScrambleIn';
 
 export const ProcessSection: React.FC = () => {
+  const [headingTriggered, setHeadingTriggered] = useState(false);
   const steps = [
     {
       num: '01',
@@ -31,6 +33,7 @@ export const ProcessSection: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
+          onViewportEnter={() => setHeadingTriggered(true)}
           transition={{ duration: 0.8 }}
           viewport={{ once: true, amount: 0.3 }}
           className="mb-16"
@@ -39,7 +42,7 @@ export const ProcessSection: React.FC = () => {
             // КАК СТРОИМ
           </div>
           <h2 className="text-white font-light text-[clamp(28px,5vw,46px)] leading-tight">
-            Четыре стадии. Без сюрпризов.
+            <ScrambleIn text="Четыре стадии. Без сюрпризов." delay={100} triggered={headingTriggered} />
           </h2>
         </motion.div>
 
