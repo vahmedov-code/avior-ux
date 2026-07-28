@@ -10,7 +10,7 @@ export const FooterSection: React.FC = () => {
           <span>© 2026 AVIOR UX</span>
         </div>
         <div>
-          ux.avior.moscow — черновик, не опубликовано
+          ux.avior.moscow
         </div>
       </div>
     </footer>
