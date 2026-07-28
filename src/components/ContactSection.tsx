@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { ScrambleIn } from './ScrambleIn';
 
 export const ContactSection: React.FC = () => {
+  const [headingTriggered, setHeadingTriggered] = useState(false);
   return (
     <section id="contact" className="relative w-full min-h-screen bg-black flex items-center justify-center py-32 px-6 overflow-hidden">
       <video
@@ -18,6 +20,7 @@ export const ContactSection: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
+          onViewportEnter={() => setHeadingTriggered(true)}
           transition={{ duration: 0.8 }}
           viewport={{ once: true, amount: 0.3 }}
           className="p-10 sm:p-16 border border-white/10 rounded-3xl bg-white/[0.02] backdrop-blur-xl"
@@ -26,7 +29,7 @@ export const ContactSection: React.FC = () => {
             // КОНТАКТЫ
           </div>
           <h2 className="text-white font-light text-[clamp(32px,5vw,52px)] leading-tight mb-6">
-            Обсудим ваш сайт
+            <ScrambleIn text="Обсудим ваш сайт" delay={100} triggered={headingTriggered} />
           </h2>
           <p className="text-white/50 text-[15px] sm:text-[17px] leading-relaxed max-w-lg mx-auto mb-10">
             Расскажите, чем занимается ваш бизнес и что должен делать сайт — отвечу с честной оценкой объёма и сроков.
