@@ -6,7 +6,7 @@ export const ServicesSection: React.FC = () => {
     {
       tag: 'Уровень 1',
       title: 'Лендинг',
-      price: 'от ___ ₽',
+      price: 'от 25 000 ₽',
       popular: false,
       features: [
         'Одна страница под ваш бизнес',
@@ -18,7 +18,7 @@ export const ServicesSection: React.FC = () => {
     {
       tag: 'Уровень 2 · Популярно',
       title: 'Лендинг + админка',
-      price: 'от ___ ₽',
+      price: 'от 55 000 ₽',
       popular: true,
       features: [
         'Всё из уровня 1',
@@ -30,7 +30,7 @@ export const ServicesSection: React.FC = () => {
     {
       tag: 'Уровень 3',
       title: 'Полный цикл',
-      price: 'от ___ ₽',
+      price: 'от 120 000 ₽',
       popular: false,
       features: [
         'Всё из уровня 2',
