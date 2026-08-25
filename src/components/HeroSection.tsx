@@ -86,7 +86,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onEntranceComplete }) 
 
       {/* Фоновый водяной знак */}
       <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none translate-y-[20px]">
-        <h2 
+        <div
+          aria-hidden="true"
           className="font-watermark uppercase tracking-[-4px] opacity-10 text-[clamp(100px,25vw,450px)] leading-none text-center"
           style={{
             backgroundImage: 'radial-gradient(circle, rgba(51,209,126,0.3) 0%, #33d17e 70%)',
@@ -95,7 +96,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onEntranceComplete }) 
           }}
         >
           AVIOR UX
-        </h2>
+        </div>
       </div>
 
       {/* Контент Hero */}
