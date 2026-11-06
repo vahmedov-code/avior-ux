@@ -11,14 +11,26 @@
 5. Выполнить `python wordstat_collect.py`. По умолчанию до 30 новых API-вызовов за запуск; план содержит 22 вызова. Автоповтора при ошибке нет. Успешные ответы остаются в кеше; повторный запуск продолжает сбор. Итоговые CSV создаются после полного прохода.
 6. Прикрепить папку результатов архивом в чат. Ключей в ней нет.
 
-PowerShell, пример переменных (ввести свои значения только локально):
+PowerShell из корня репозитория, пример переменных (ввести свои значения только локально):
 
 ```powershell
-$env:YANDEX_API_KEY = Read-Host 'API key'
+$secureKey = Read-Host 'API key' -AsSecureString
+$env:YANDEX_API_KEY = [System.Net.NetworkCredential]::new('', $secureKey).Password
 $env:YANDEX_FOLDER_ID = Read-Host 'Folder ID'
-python wordstat_collect.py
-Remove-Item Env:YANDEX_API_KEY
+try {
+  python tools/demand/wordstat_collect.py --smoke-first --max-calls 22 --cache ../wordstat-cache-private --out ../wordstat-results-private
+} finally {
+  Remove-Item Env:YANDEX_API_KEY -ErrorAction SilentlyContinue
+  Remove-Item Env:YANDEX_FOLDER_ID -ErrorAction SilentlyContinue
+  $secureKey.Dispose()
+}
 ```
+
+Пути `--cache` и `--out` должны находиться **вне репозитория**; в примере предполагается запуск из корня репозитория. При запуске из `tools/demand` задайте абсолютные внешние пути.
+
+Можно обойтись без ручного присвоения переменных: `python tools/demand/wordstat_collect.py --prompt-credentials --smoke-first --max-calls 22 --cache <внешний-кеш> --out <внешние-результаты>` из корня репозитория. Флаг `--prompt-credentials` спрашивает отсутствующие значения в интерактивном терминале и скрывает ввод ключа. Значения существуют только в окружении процесса Python, не сохраняются в файлы или пользовательские переменные Windows. При невозможности скрытого ввода программа прекращает работу.
+
+`--smoke-first` сначала проверяет первую фразу с теми же параметрами, что в полном плане. При ошибке сбор прекращается без автоматического повтора. Успешный ответ используется из общего кеша, поэтому весь план с пробой требует до 22 новых вызовов, а не 23. Лимит общий для пробы и сбора. При существующем кеше проба может потребовать 0 новых вызовов: для проверки живого доступа используйте новый внешний кеш. Даже неуспешная HTTP-попытка учитывается в лимите запуска; повторный запуск начинает новый лимит — не повторяйте его автоматически.
 
 ## Что получим
 

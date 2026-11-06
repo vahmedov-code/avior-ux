@@ -2,6 +2,7 @@
 """Collect official Yandex Search API Wordstat data. Python 3.10+, stdlib only."""
 import argparse
 import csv
+import getpass
 import hashlib
 import json
 import os
@@ -9,6 +10,7 @@ from pathlib import Path
 import re
 import sys
 import time
+import warnings
 from datetime import datetime, timezone
 from urllib.request import Request, urlopen, build_opener, HTTPRedirectHandler
 from urllib.error import HTTPError, URLError
@@ -133,6 +135,10 @@ def main():
     parser.add_argument('--max-calls', type=int, default=30)
     parser.add_argument('--offline', action='store_true')
     parser.add_argument('--plan', action='store_true', help='Показать план без API-вызовов')
+    parser.add_argument('--prompt-credentials', action='store_true',
+                        help='Запросить отсутствующие переменные доступа локально; ключ вводится скрыто')
+    parser.add_argument('--smoke-first', action='store_true',
+                        help='Проверить первую фразу перед сбором, используя общий кеш и лимит')
     args = parser.parse_args()
     try:
         config = read_json(args.config)
@@ -148,13 +154,35 @@ def main():
         print(f'Фраз: {len(seeds)}. До {maximum} запросов без кеша. Лимит запуска: {args.max_calls}.')
         if args.plan:
             return 0
+        if args.prompt_credentials and not args.offline:
+            if not sys.stdin.isatty():
+                raise ValueError('Для скрытого ввода откройте интерактивный терминал.')
+            if not os.environ.get('YANDEX_FOLDER_ID'):
+                os.environ['YANDEX_FOLDER_ID'] = input('YANDEX_FOLDER_ID: ').strip()
+            if not os.environ.get('YANDEX_API_KEY'):
+                with warnings.catch_warnings():
+                    warnings.simplefilter('error', getpass.GetPassWarning)
+                    os.environ['YANDEX_API_KEY'] = getpass.getpass('YANDEX_API_KEY (hidden): ').strip()
         folder = os.environ.get('YANDEX_FOLDER_ID', '')
         if not folder:
             raise ValueError('Задайте YANDEX_FOLDER_ID — идентификатор каталога Yandex Cloud.')
         client = Client(folder, args.cache, args.max_calls, args.offline)
+        if args.smoke_first:
+            payload = {'phrase': seeds[0], 'numPhrases': str(config.get('num_phrases', 100)),
+                       'regions': config['regions'][0]['ids'], 'devices': ['DEVICE_ALL']}
+            result, _ = client.call('topRequests', payload)
+            if 'totalCount' not in result or not isinstance(result.get('results'), list):
+                raise RuntimeError('Пробный ответ не содержит ожидаемые поля; сбор остановлен.')
+            print(f'Проба успешна. Новых вызовов: {client.calls}. Продолжаю с общим лимитом {args.max_calls}.')
         collect(config, client, args.out)
         print(f'Готово: {args.out.resolve()}. API-вызовов: {client.calls}')
         return 0
+    except getpass.GetPassWarning:
+        print('Ошибка: терминал не поддерживает скрытый ввод. Ключ не запрашивался.', file=sys.stderr)
+        return 1
+    except (EOFError, KeyboardInterrupt):
+        print('Ввод отменён; сбор остановлен.', file=sys.stderr)
+        return 1
     except (ValueError, KeyError, OSError, RuntimeError) as exc:
         print(f'Ошибка: {exc}', file=sys.stderr)
         return 1
