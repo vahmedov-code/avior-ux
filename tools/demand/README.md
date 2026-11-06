@@ -62,3 +62,9 @@ Wordstat не даёт цену клика. После ручной очистк
 - https://aistudio.yandex.ru/ru/docs/search-api/api-ref/Wordstat/getRegionsDistribution
 - https://aistudio.yandex.ru/ru/docs/search-api/api-ref/Wordstat/getRegionsTree
 - https://yandex.ru/support/direct/ru/impressions/budget-estimation
+
+## Ответ без детализации
+
+Живая проба показала, что topRequests может вернуть только totalCount без results и associations. Сборщик принимает отсутствующие списки как пустые и сохраняет их размеры в metadata.json → top_response_details. Это не доказывает отсутствие спроса или коммерческих фраз. При продолжении после уже оплаченной/выполненной пробы используйте тот же кеш и уменьшите лимит до 21, чтобы весь сеанс не превысил 22 вызова.
+
+Регрессионные проверки без API: `python -m unittest discover -s tools/demand -p test_wordstat_collect.py -v`.

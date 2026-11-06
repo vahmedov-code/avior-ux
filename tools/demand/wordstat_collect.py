@@ -88,7 +88,7 @@ def csv_write(path, columns, rows):
 
 
 def collect(config, client, output):
-    candidates, totals, distributions = {}, [], []
+    candidates, totals, distributions, detail_counts = {}, [], [], []
     output.mkdir(parents=True, exist_ok=True)
     for group in config['groups']:
         for seed in group['seeds']:
@@ -97,6 +97,9 @@ def collect(config, client, output):
                            'regions': region_set['ids'], 'devices': ['DEVICE_ALL']}
                 result, stamp = client.call('topRequests', payload)
                 scope = region_set['label']
+                detail_counts.append(dict(group=group['name'], seed=seed, region=scope,
+                    results_count=len(result.get('results', [])),
+                    associations_count=len(result.get('associations', []))))
                 totals.append(dict(group=group['name'], seed=seed, region=scope,
                                    count=result.get('totalCount', ''), collected_at=stamp))
                 for kind in ('results', 'associations'):
@@ -120,7 +123,7 @@ def collect(config, client, output):
     csv_write(output / 'seed_totals.csv', ['group','seed','region','count','collected_at'], totals)
     csv_write(output / 'cities.csv', ['group','seed','region_id','count','share','affinity_index','collected_at'], distributions)
     dump(output / 'metadata.json', {'created_at': datetime.now(timezone.utc).isoformat(), 'api_calls_this_run': client.calls,
-        'config': config, 'notes': ['Частотности пересекаются: не суммировать.',
+        'config': config, 'top_response_details': detail_counts, 'notes': ['Частотности пересекаются: не суммировать.',
         'Широкая частотность, не число людей/кликов/покупателей.',
         'Оценки цены клика и прибыли отсутствуют: нужны Директ и данные продаж.',
         'Похожие запросы (associations) требуют отдельной проверки.',
@@ -171,9 +174,12 @@ def main():
             payload = {'phrase': seeds[0], 'numPhrases': str(config.get('num_phrases', 100)),
                        'regions': config['regions'][0]['ids'], 'devices': ['DEVICE_ALL']}
             result, _ = client.call('topRequests', payload)
-            if 'totalCount' not in result or not isinstance(result.get('results'), list):
+            if (not str(result.get('totalCount', '')).isdigit()
+                    or any(not isinstance(result.get(k, []), list) for k in ('results', 'associations'))):
                 raise RuntimeError('Пробный ответ не содержит ожидаемые поля; сбор остановлен.')
             print(f'Проба успешна. Новых вызовов: {client.calls}. Продолжаю с общим лимитом {args.max_calls}.')
+            if not result.get('results') and not result.get('associations'):
+                print('API вернул только общую частотность без детализации фраз; это отмечается в metadata.json.')
         collect(config, client, args.out)
         print(f'Готово: {args.out.resolve()}. API-вызовов: {client.calls}')
         return 0
