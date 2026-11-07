@@ -8,6 +8,8 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
+import ssl
 import sys
 import time
 import warnings
@@ -40,7 +42,8 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 class Client:
-    def __init__(self, folder, cache, max_calls=30, offline=False):
+    def __init__(self, folder, cache, max_calls=30, offline=False, timeout=40):
+        self.timeout = timeout
         self.folder, self.cache = folder, cache
         self.max_calls, self.offline, self.calls = max_calls, offline, 0
         self.cache.mkdir(parents=True, exist_ok=True)
@@ -63,12 +66,23 @@ class Client:
         request = Request(BASE + method, data=json.dumps(body).encode(), headers={
             'Authorization': 'Api-Key ' + token, 'Content-Type': 'application/json'}, method='POST')
         try:
-            with build_opener(NoRedirect()).open(request, timeout=40) as response:
+            with build_opener(NoRedirect()).open(request, timeout=self.timeout) as response:
                 result = json.load(response)
         except HTTPError as exc:
             raise RuntimeError(f'API вернул HTTP {exc.code}. Проверьте права, квоту и настройки каталога; автоповтора нет.') from None
-        except URLError:
-            raise RuntimeError('Ошибка соединения с API. Ответ не сохранён; повторите позже.') from None
+        except (URLError, TimeoutError, ConnectionError, ssl.SSLError) as exc:
+            reason = getattr(exc, 'reason', exc)
+            if isinstance(reason, TimeoutError) or 'timed out' in str(reason).lower():
+                category = 'превышено время ожидания'
+            elif isinstance(reason, ssl.SSLError):
+                category = 'сбой TLS-соединения'
+            elif isinstance(reason, socket.gaierror):
+                category = 'сбой DNS'
+            else:
+                category = 'обрыв или недоступность соединения'
+            raise RuntimeError(f'Ошибка соединения с API ({category}; {type(reason).__name__}) '
+                               f'при {method}, ожидание {self.timeout} с. '
+                               'Успешные ответы сохранены в кеше; автоповтора нет.') from None
         if not isinstance(result, dict) or not isinstance(result.get('results', []), list):
             raise RuntimeError('Неожиданный формат ответа API; сбор остановлен.')
         stamp = datetime.now(timezone.utc).isoformat()
@@ -153,6 +167,7 @@ def main():
     parser.add_argument('--out', type=Path, default=Path('wordstat-results'))
     parser.add_argument('--cache', type=Path, default=Path('wordstat-cache'))
     parser.add_argument('--max-calls', type=int, default=30)
+    parser.add_argument('--timeout', type=float, default=40, help='Ожидание ответа API в секундах (1–300)')
     parser.add_argument('--offline', action='store_true')
     parser.add_argument('--plan', action='store_true', help='Показать план без API-вызовов')
     parser.add_argument('--prompt-credentials', action='store_true',
@@ -165,7 +180,8 @@ def main():
         seeds = [s for g in config['groups'] for s in g['seeds']]
         if not seeds or any(not s.strip() or len(s) > 400 for s in seeds):
             raise ValueError('Нужны непустые фразы до 400 символов.')
-        if not 1 <= config.get('num_phrases', 100) <= 2000 or args.max_calls < 1:
+        if (not 1 <= config.get('num_phrases', 100) <= 2000 or args.max_calls < 1
+                or not 1 <= args.timeout <= 300):
             raise ValueError('Некорректный лимит.')
         for r in config['regions']:
             if not r['ids'] or len(r['ids']) > 100 or not all(str(i).isdigit() for i in r['ids']):
@@ -189,7 +205,7 @@ def main():
         folder = os.environ.get('YANDEX_FOLDER_ID', '')
         if not folder:
             raise ValueError('Задайте YANDEX_FOLDER_ID — идентификатор каталога Yandex Cloud.')
-        client = Client(folder, args.cache, args.max_calls, args.offline)
+        client = Client(folder, args.cache, args.max_calls, args.offline, args.timeout)
         if args.smoke_first:
             payload = {'phrase': seeds[0], 'numPhrases': str(config.get('num_phrases', 100)),
                        'regions': config['regions'][0]['ids'], 'devices': ['DEVICE_ALL']}

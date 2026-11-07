@@ -8,7 +8,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 sys.path.insert(0, str(Path(__file__).parent))
 import wordstat_collect as collector
@@ -76,6 +76,34 @@ class SmokeTests(unittest.TestCase):
         tree = {'regions': [{'id': '225', 'label': 'Russia', 'children': []}]}
         code, calls, _ = self.exercise({'totalCount': '7'}, limit=3, config=config, tree=tree)
         self.assertEqual((code, len(calls)), (1, 2))
+
+    def test_network_timeout_keeps_cache_and_resumes_without_repeating_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = {'phrase': 'test'}
+            client = collector.Client('test-folder', root / 'cache', max_calls=2, timeout=90)
+            opener = unittest.mock.Mock()
+            opener.open.side_effect = [io.StringIO('{"totalCount":"7"}'), URLError(TimeoutError())]
+            with patch.dict(os.environ, {'YANDEX_API_KEY': 'test-placeholder'}), \
+                patch.object(collector, 'build_opener', return_value=opener), \
+                patch.object(collector.time, 'sleep'):
+                client.call('topRequests', payload)
+                with self.assertRaisesRegex(RuntimeError, 'TimeoutError'):
+                    client.call('regions', payload)
+            self.assertEqual(client.calls, 2)
+            self.assertEqual(len(list((root / 'cache').glob('*.json'))), 1)
+            self.assertEqual(opener.open.call_count, 2)
+            self.assertEqual(opener.open.call_args.kwargs['timeout'], 90)
+            resumed = collector.Client('test-folder', root / 'cache', max_calls=1, timeout=90)
+            with patch.dict(os.environ, {'YANDEX_API_KEY': 'test-placeholder'}), \
+                patch.object(collector, 'build_opener', return_value=opener), \
+                patch.object(collector.time, 'sleep'):
+                resumed.call('topRequests', payload)
+                self.assertEqual(resumed.calls, 0)
+                opener.open.side_effect = [io.StringIO('{"results":[]}')]
+                resumed.call('regions', payload)
+            self.assertEqual(resumed.calls, 1)
+            self.assertEqual(len(list((root / 'cache').glob('*.json'))), 2)
 
     def test_empty_hidden_key_stops_before_network(self):
         with tempfile.TemporaryDirectory() as directory:
