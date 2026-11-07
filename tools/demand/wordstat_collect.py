@@ -90,6 +90,22 @@ def csv_write(path, columns, rows):
 def collect(config, client, output):
     candidates, totals, distributions, detail_counts = {}, [], [], []
     output.mkdir(parents=True, exist_ok=True)
+    if config.get('collect_region_tree', False):
+        tree, stamp = client.call('getRegionsTree', {})
+        if not isinstance(tree.get('regions'), list) or not tree['regions']:
+            raise RuntimeError('API не вернул дерево регионов; сбор остановлен.')
+        labels = {}
+        pending = list(tree['regions'])
+        while pending:
+            node = pending.pop()
+            labels[str(node['id'])] = node['label']
+            pending.extend(node.get('children', []))
+        for scope in config['regions']:
+            if any(str(region_id) not in labels for region_id in scope['ids']):
+                raise RuntimeError('Регион плана отсутствует в дереве Wordstat; сбор остановлен.')
+            if len(scope['ids']) == 1:
+                scope['label'] = labels[str(scope['ids'][0])]
+        dump(output / 'regions_tree.json', {'collected_at': stamp, 'regions': tree['regions']})
     for group in config['groups']:
         for seed in group['seeds']:
             for region_set in config['regions']:
@@ -119,6 +135,7 @@ def collect(config, client, output):
                     distributions.append(dict(group=group['name'], seed=seed, region_id=item['region'],
                         count=item['count'], share=item.get('share', ''),
                         affinity_index=item.get('affinityIndex', ''), collected_at=stamp))
+            print(f'Собрано: {seed}. Новых API-вызовов: {client.calls}', flush=True)
     csv_write(output / 'candidates.csv', ['group','region','kind','phrase','count','review','seeds','collected_at'], candidates.values())
     csv_write(output / 'seed_totals.csv', ['group','seed','region','count','collected_at'], totals)
     csv_write(output / 'cities.csv', ['group','seed','region_id','count','share','affinity_index','collected_at'], distributions)
@@ -153,7 +170,8 @@ def main():
         for r in config['regions']:
             if not r['ids'] or len(r['ids']) > 100 or not all(str(i).isdigit() for i in r['ids']):
                 raise ValueError('Нужны идентификаторы регионов; пустой список запрещён во избежание сбора по всему миру.')
-        maximum = len(seeds) * (len(config['regions']) + int(config.get('collect_city_distribution', True)))
+        maximum = (len(seeds) * (len(config['regions']) + int(config.get('collect_city_distribution', True)))
+                   + int(config.get('collect_region_tree', False)))
         print(f'Фраз: {len(seeds)}. До {maximum} запросов без кеша. Лимит запуска: {args.max_calls}.')
         if args.plan:
             return 0
@@ -166,6 +184,8 @@ def main():
                 with warnings.catch_warnings():
                     warnings.simplefilter('error', getpass.GetPassWarning)
                     os.environ['YANDEX_API_KEY'] = getpass.getpass('YANDEX_API_KEY (hidden): ').strip()
+            if not os.environ.get('YANDEX_API_KEY'):
+                raise ValueError('Ключ не введён. Вставьте секретный API-ключ в скрытый ввод до Enter.')
         folder = os.environ.get('YANDEX_FOLDER_ID', '')
         if not folder:
             raise ValueError('Задайте YANDEX_FOLDER_ID — идентификатор каталога Yandex Cloud.')
