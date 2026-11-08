@@ -13,6 +13,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+import wordstat_credentials as credentials
 from wordstat_collect import dump, read_json
 
 HERE = Path(__file__).resolve().parent
@@ -34,9 +35,44 @@ REGIONS = {
 }
 
 
+def prepared_plan(path):
+    config = read_json(path)
+    title = config.get('title', path.stem).strip()
+    groups, regions = config['groups'], config['regions']
+    count = config.get('num_phrases', 100)
+    cities = config.get('collect_city_distribution', True)
+    tree = config.get('collect_region_tree', False)
+    if not title or type(count) is not int or not 1 <= count <= 2000:
+        raise ValueError('Неверное название или лимит уточнений.')
+    if type(cities) is not bool or type(tree) is not bool:
+        raise ValueError('Неверные параметры распределения.')
+    if not isinstance(groups, list) or not groups or not all(
+        isinstance(group['name'], str) and group['name'].strip()
+        and isinstance(group['seeds'], list) and group['seeds']
+        and all(isinstance(seed, str) and seed.strip() and len(seed) <= 400 for seed in group['seeds'])
+        for group in groups
+    ):
+        raise ValueError('Неверные группы фраз.')
+    if not isinstance(regions, list) or not regions or not all(
+        isinstance(region['label'], str) and region['label'].strip()
+        and isinstance(region['ids'], list) and 1 <= len(region['ids']) <= 100
+        and all(str(code).isdigit() for code in region['ids'])
+        for region in regions
+    ):
+        raise ValueError('Неверные регионы.')
+    return {
+        'title': title, 'num_phrases': count,
+        'groups': [{'name': group['name'], 'seeds': group['seeds']} for group in groups],
+        'regions': [{'label': region['label'], 'ids': [str(code) for code in region['ids']]} for region in regions],
+        'collect_city_distribution': cities, 'collect_region_tree': tree,
+    }
+
+
 class App:
-    def __init__(self, root, storage, folder_id='', history=None):
+    def __init__(self, root, storage, folder_id='', history=None, plans=None, icon=None):
         self.root, self.storage, self.history = root, storage, history
+        self.plans, self.icon = plans, icon
+        self.prepared = {}
         self.datasets = {}
         self.stats_rows = []
         self.visible_rows = {}
@@ -50,16 +86,20 @@ class App:
         self.run_dir = None
         self.stopped = False
         self.messages = queue.Queue()
-        self.preset = tk.StringVar(value=next(iter(PRESETS)))
+        self.preset = tk.StringVar()
         self.folder_id = tk.StringVar(value=folder_id)
         self.api_key = tk.StringVar()
+        self.key_status = tk.StringVar()
+        self.plan_status = tk.StringVar()
+        self.phrase_heading = tk.StringVar()
         self.city = tk.BooleanVar()
         self.regions = {code: tk.BooleanVar() for code in REGIONS}
         self.limit = tk.StringVar()
         self.summary = tk.StringVar()
         self.status = tk.StringVar(value='Готово к запуску')
         self.build()
-        self.select_preset()
+        self.refresh_plans()
+        self.refresh_key_status()
         self.refresh_datasets()
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.after(80, self.poll)
@@ -67,6 +107,8 @@ class App:
     def build(self):
         root = self.root
         root.title('AVIOR Wordstat')
+        if self.icon and self.icon.is_file():
+            root.iconbitmap(default=str(self.icon))
         root.geometry('1060x700')
         root.minsize(880, 620)
         root.option_add('*Font', ('Segoe UI', 10))
@@ -87,7 +129,7 @@ class App:
             form.columnconfigure(column, weight=1)
         for column, label in enumerate(('Исследование', 'Folder ID', 'API-ключ')):
             ttk.Label(form, text=label).grid(row=0, column=column, sticky='w', padx=4)
-        self.picker = ttk.Combobox(form, values=(*PRESETS, CUSTOM), textvariable=self.preset, state='readonly')
+        self.picker = ttk.Combobox(form, textvariable=self.preset, state='readonly')
         self.picker.grid(row=1, column=0, sticky='ew', padx=4)
         self.picker.bind('<<ComboboxSelected>>', self.select_preset)
         self.folder_entry = ttk.Entry(form, textvariable=self.folder_id)
@@ -95,15 +137,27 @@ class App:
         self.key_entry = ttk.Entry(form, textvariable=self.api_key, show='•')
         self.key_entry.grid(row=1, column=2, sticky='ew', padx=4)
 
-        geographic = ttk.Frame(form)
-        geographic.grid(row=2, column=0, columnspan=3, sticky='w', pady=(8, 0))
-        self.checks = []
+        plan_controls = ttk.Frame(form)
+        plan_controls.grid(row=2, column=0, columnspan=2, sticky='w', pady=(5, 0))
+        if self.plans is not None:
+            ttk.Button(plan_controls, text='Обновить планы', command=self.refresh_plans).pack(side='left')
+            ttk.Label(plan_controls, textvariable=self.plan_status, style='Subtitle.TLabel').pack(side='left', padx=6)
+        key_controls = ttk.Frame(form)
+        key_controls.grid(row=2, column=2, sticky='e', pady=(5, 0))
+        ttk.Button(key_controls, text='Сохранить ключ', command=self.save_key).pack(side='left')
+        self.delete_key_button = ttk.Button(key_controls, text='Удалить', command=self.delete_key)
+        self.delete_key_button.pack(side='left', padx=(4, 0))
+        ttk.Label(form, textvariable=self.key_status, style='Subtitle.TLabel').grid(
+            row=3, column=2, sticky='e', pady=(2, 0))
+
+        self.geographic = ttk.Frame(form)
+        self.geographic.grid(row=4, column=0, columnspan=3, sticky='w', pady=(8, 0))
+        self.prepared_regions = ttk.Label(form, style='Subtitle.TLabel', wraplength=810)
         for code, label in REGIONS.items():
-            control = ttk.Checkbutton(geographic, text=label, variable=self.regions[code], command=self.refresh)
+            control = ttk.Checkbutton(self.geographic, text=label, variable=self.regions[code], command=self.refresh)
             control.pack(side='left', padx=3)
-            self.checks.append(control)
         options = ttk.Frame(form)
-        options.grid(row=3, column=0, columnspan=3, sticky='w', pady=(6, 0))
+        options.grid(row=5, column=0, columnspan=3, sticky='w', pady=(6, 0))
         self.city_check = ttk.Checkbutton(options, text='Распределение по городам', variable=self.city, command=self.refresh)
         self.city_check.pack(side='left')
         ttk.Label(options, text='Лимит попыток').pack(side='left', padx=(18, 4))
@@ -111,10 +165,10 @@ class App:
         self.limit_entry.pack(side='left')
         self.limit.trace_add('write', lambda *_: self.refresh())
 
-        ttk.Label(form, text='Поисковые фразы · одна фраза на строку для режима «Свои запросы»').grid(
-            row=4, column=0, columnspan=3, sticky='w', pady=(8, 3))
+        ttk.Label(form, textvariable=self.phrase_heading).grid(
+            row=6, column=0, columnspan=3, sticky='w', pady=(8, 3))
         self.phrases = tk.Text(form, height=4, wrap='word', font=('Segoe UI', 10), undo=True)
-        self.phrases.grid(row=5, column=0, columnspan=3, sticky='ew')
+        self.phrases.grid(row=7, column=0, columnspan=3, sticky='ew')
         self.phrases.bind('<<Modified>>', self.phrases_changed)
 
         ttk.Label(self.settings, textvariable=self.summary, style='Subtitle.TLabel', wraplength=960).pack(anchor='w', pady=(9, 5))
@@ -241,8 +295,14 @@ class App:
             if not (path / 'results/seed_totals.csv').is_file():
                 continue
             label = names.get(path.name, path.name)
+            try:
+                name = read_json(path / 'session.json').get('research_name')
+                if isinstance(name, str) and name:
+                    label = f'{name} · {path.name[:16].replace("_", " ")}'
+            except (OSError, ValueError, AttributeError):
+                pass
             if label in datasets:
-                label = f'{label} · {path.parent.name}'
+                label = f'{label} · {path.name}'
             if label in datasets:
                 label = str(path)
             datasets[label] = path
@@ -330,17 +390,93 @@ class App:
             self.comparison.insert('', 'end', iid=str(index), values=values)
         self.compare_status.set(f'Выбрано {len(self.pinned)} из 4')
 
+    def refresh_plans(self):
+        selected = self.preset.get()
+        self.prepared = {}
+        invalid = 0
+        if self.plans is not None:
+            try:
+                paths = sorted(self.plans.glob('*.json'), key=lambda path: path.stat().st_mtime_ns, reverse=True)
+            except OSError:
+                paths = []
+                invalid = 1
+            for path in paths:
+                try:
+                    config = prepared_plan(path)
+                except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                    invalid += 1
+                    continue
+                label = f'План · {config["title"]}'
+                if label in self.prepared:
+                    label = f'{label} ({path.stem})'
+                while label in self.prepared:
+                    label += ' ·'
+                self.prepared[label] = config
+        status = f'Готовых планов: {len(self.prepared)}'
+        if invalid:
+            status += f' · не прочитано: {invalid}'
+        self.plan_status.set(status)
+        choices = (*self.prepared, *PRESETS, CUSTOM)
+        self.picker.configure(values=choices)
+        if self.source_run or selected == CUSTOM:
+            return
+        self.preset.set((selected if selected in choices else CUSTOM) if selected else choices[0])
+        self.select_preset()
+
+    def refresh_key_status(self):
+        try:
+            saved = bool(credentials.read_key())
+            self.key_status.set('Ключ сохранён в Windows' if saved else 'Ключ не сохранён')
+            self.delete_key_button.configure(state='normal' if saved else 'disabled')
+        except (OSError, ValueError):
+            self.key_status.set('Хранилище Windows недоступно')
+            self.delete_key_button.configure(state='normal')
+
+    def save_key(self):
+        key = self.api_key.get().strip()
+        if not key:
+            self.key_status.set('Введите API-ключ для сохранения')
+            self.key_entry.focus_set()
+            return
+        try:
+            credentials.save_key(key)
+        except (OSError, ValueError):
+            messagebox.showerror('API-ключ', 'Не удалось сохранить ключ в Windows.', parent=self.root)
+            return
+        self.api_key.set('')
+        self.refresh_key_status()
+
+    def delete_key(self):
+        try:
+            credentials.delete_key()
+        except OSError:
+            messagebox.showerror('API-ключ', 'Не удалось удалить сохранённый ключ.', parent=self.root)
+            return
+        self.api_key.set('')
+        self.refresh_key_status()
+
     def select_preset(self, _event=None):
         self.source_run = None
+        self.config = self.prepared.get(self.preset.get())
         preset = PRESETS.get(self.preset.get())
-        self.config = read_json(HERE / preset) if preset else {
-            'num_phrases': 100, 'regions': [{'ids': ['225'], 'label': 'Россия'}],
-            'collect_city_distribution': False, 'collect_region_tree': False, 'groups': [],
-        }
+        if self.config is None:
+            self.config = read_json(HERE / preset) if preset else {
+                'num_phrases': 100, 'regions': [{'ids': ['225'], 'label': 'Россия'}],
+                'collect_city_distribution': False, 'collect_region_tree': False, 'groups': [],
+            }
         self.show_config()
         self.refresh()
 
     def show_config(self):
+        fixed = self.source_run or self.preset.get() in self.prepared
+        if fixed:
+            self.geographic.grid_remove()
+            labels = ', '.join(region['label'] for region in self.config['regions'])
+            self.prepared_regions.configure(text=f'Регионы плана · {labels}')
+            self.prepared_regions.grid(row=4, column=0, columnspan=3, sticky='w', pady=(8, 0))
+        else:
+            self.prepared_regions.grid_remove()
+            self.geographic.grid()
         selected = {str(code) for region in self.config['regions'] for code in region['ids']}
         for code, variable in self.regions.items():
             variable.set(code in selected)
@@ -349,10 +485,10 @@ class App:
         self.phrases.delete('1.0', 'end')
         self.phrases.insert('1.0', '\n'.join(seed for group in self.config['groups'] for seed in group['seeds']))
         self.phrases.edit_modified(False)
-        self.phrases.configure(state='normal' if self.preset.get() == CUSTOM and not self.source_run else 'disabled')
-        state = 'disabled' if self.source_run else 'normal'
-        for control in (*self.checks, self.city_check):
-            control.configure(state=state)
+        custom = self.preset.get() == CUSTOM and not self.source_run
+        self.phrase_heading.set('Поисковые фразы · одна фраза на строку' if custom else 'Поисковые фразы плана')
+        self.phrases.configure(state='normal' if custom else 'disabled')
+        self.city_check.configure(state='disabled' if fixed else 'normal')
         self.limit.set('')
 
     def phrases_changed(self, _event):
@@ -361,7 +497,7 @@ class App:
             self.refresh()
 
     def current_config(self):
-        if self.source_run:
+        if self.source_run or self.preset.get() in self.prepared:
             return self.config
         config = dict(self.config)
         config['regions'] = [
@@ -438,8 +574,15 @@ class App:
             return
         key, folder = self.api_key.get().strip(), self.folder_id.get().strip()
         try:
-            if not key or not folder:
-                raise ValueError('Укажите Folder ID и API-ключ.')
+            if not folder:
+                raise ValueError('Укажите Folder ID.')
+            if not key:
+                try:
+                    key = credentials.read_key()
+                except (OSError, ValueError):
+                    raise ValueError('Хранилище Windows недоступно. Введите API-ключ для этого запуска.') from None
+            if not key:
+                raise ValueError('Введите API-ключ. Его можно сохранить для следующих запусков.')
             config = self.current_config()
             phrases, regions, planned, _cost, limit, _ceiling = self.estimate(config)
             if not phrases or not regions or any(len(seed) > 400 for g in config['groups'] for seed in g['seeds']):
@@ -456,7 +599,8 @@ class App:
                 for cached in (self.source_run / 'cache').glob('*.json'):
                     shutil.copy2(cached, cache / cached.name)
             dump(run_dir / 'config.json', config)
-            dump(run_dir / 'session.json', {'folder_id': folder})
+            research_name = config.get('title') or self.preset.get()
+            dump(run_dir / 'session.json', {'folder_id': folder, 'research_name': research_name})
             python = Path(sys.executable)
             if python.name.lower() == 'pythonw.exe':
                 python = python.with_name('python.exe')
@@ -574,6 +718,8 @@ def main():
     parser.add_argument('--storage', type=Path, default=Path.home() / 'Documents' / 'Codex' / 'wordstat-gui')
     parser.add_argument('--folder-cache', type=Path)
     parser.add_argument('--history', type=Path)
+    parser.add_argument('--plans', type=Path)
+    parser.add_argument('--icon', type=Path)
     args = parser.parse_args()
     folder = os.environ.get('YANDEX_FOLDER_ID', '')
     if not folder and args.folder_cache:
@@ -584,7 +730,8 @@ def main():
             except (OSError, ValueError, KeyError, TypeError):
                 pass
     root = tk.Tk()
-    App(root, args.storage.resolve(), folder, args.history.resolve() if args.history else None)
+    App(root, args.storage.resolve(), folder, args.history.resolve() if args.history else None,
+        args.plans.resolve() if args.plans else None, args.icon)
     root.mainloop()
 
 
