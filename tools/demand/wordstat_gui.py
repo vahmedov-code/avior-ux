@@ -17,6 +17,7 @@ from wordstat_collect import dump, read_json
 
 HERE = Path(__file__).resolve().parent
 PRESETS = {
+    'Автоматизация малого и среднего бизнеса': 'research-smb-automation.json',
     'Telegram и MAX': 'research-bot-platforms.json',
     'Лиды для ремонтных мастерских': 'research-repair-leads.json',
     'Расширенное исследование ремонта': 'research-repair-expanded.json',
